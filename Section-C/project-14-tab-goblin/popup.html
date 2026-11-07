@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { width: 340px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 15px; margin: 0; background: #1e1e2f; color: #eee; }
+    h2, h3 { margin: 0 0 10px 0; color: #a29bfe; }
+    .header { text-align: center; margin-bottom: 15px; }
+    #goblin-avatar { font-size: 50px; margin-bottom: 5px; }
+    .btn { background: #6c5ce7; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-bottom: 8px; }
+    .btn:hover { background: #5a4bcf; }
+    .btn-action { background: #00b894; }
+    .btn-action:hover { background: #00a884; }
+    .btn-danger { background: #d63031; }
+    .btn-danger:hover { background: #c0392b; }
+    .flex-row { display: flex; gap: 8px; margin-bottom: 15px; }
+    
+    .whitelist-section { background: #2d3436; padding: 10px; border-radius: 6px; margin-bottom: 15px; }
+    .input-group { display: flex; gap: 5px; margin-bottom: 10px; }
+    .input-group input { flex: 1; padding: 6px; border: none; border-radius: 4px; background: #636e72; color: #fff; }
+    
+    .list { list-style: none; padding: 0; margin: 0; max-height: 140px; overflow-y: auto; font-size: 12px; }
+    .list li { background: #2d3436; margin-bottom: 5px; padding: 6px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .list li span { overflow: hidden; text-overflow: ellipsis; }
+    .badge { background: #ffeaa7; color: #2d3436; padding: 2px 6px; border-radius: 10px; font-size: 10px; font-weight: bold; margin-left: 5px; }
+    .remove-btn { color: #ff7675; cursor: pointer; font-weight: bold; padding: 0 5px; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div id="goblin-avatar">👺</div>
+    <h2><span id="tab-count">0</span> Tabs Open</h2>
+    <p id="goblin-status" style="font-size: 13px; color: #b2bec3; margin: 0;">Goblin is assessing your tabs...</p>
+  </div>
+
+  <button class="btn btn-action" id="feed-btn">🍖 Feed the Goblin (Discard Idle Tabs)</button>
+  
+  <div class="flex-row">
+    <button class="btn" id="save-session-btn">Save Session</button>
+    <button class="btn" id="restore-session-btn">Restore Session</button>
+  </div>
+
+  <div class="whitelist-section">
+    <h3>Keep Safe (Whitelist)</h3>
+    <div class="input-group">
+      <input type="text" id="whitelist-input" placeholder="e.g., youtube.com" />
+      <button class="btn" style="width: auto; margin: 0;" id="add-whitelist-btn">Add</button>
+    </div>
+    <ul id="whitelist-list" class="list" style="max-height: 80px;"></ul>
+  </div>
+
+  <h3>Open Tabs (Idle sorted)</h3>
+  <ul id="tab-list" class="list"></ul>
+
+  <script src="popup.js"></script>
+</body>
+</html>

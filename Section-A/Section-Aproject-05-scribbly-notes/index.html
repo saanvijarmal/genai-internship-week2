@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scribbly Notes</title>
+    <style>
+        /* 
+         * 100% OFFLINE FONTS
+         * Using local() to access built-in OS handwriting fonts to avoid external network calls,
+         * ensuring the app works perfectly offline as requested.
+         */
+        @font-face {
+            font-family: 'Handwriting 1';
+            src: local('Segoe Print'), local('Chalkboard SE'), local('Comic Sans MS'), cursive;
+        }
+        @font-face {
+            font-family: 'Handwriting 2';
+            src: local('Bradley Hand'), local('Bradley Hand ITC'), local('Caveat'), cursive;
+        }
+        @font-face {
+            font-family: 'Handwriting 3';
+            src: local('Brush Script MT'), local('Snell Roundhand'), local('Pacifico'), cursive;
+        }
+
+        /* --- GLOBAL & UI STYLES --- */
+        :root {
+            --bg-dark: #1e293b;
+            --bg-panel: #0f172a;
+            --text-light: #f8fafc;
+            --accent: #3b82f6;
+            
+            --ink-blue: #0f4c81;
+            --ink-black: #222222;
+            --ink-red: #8b0000;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #cbd5e1;
+        }
+
+        /* LEFT SIDEBAR CONTROLS */
+        #sidebar {
+            width: 350px;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            display: flex;
+            flex-direction: column;
+            border-right: 2px solid #000;
+            z-index: 10;
+        }
+
+        .header {
+            padding: 20px;
+            background-color: var(--bg-panel);
+            border-bottom: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .controls {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            border-bottom: 1px solid #334155;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .control-group label {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #94a3b8;
+        }
+
+        select, button {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #475569;
+            background-color: #334155;
+            color: white;
+            font-size: 0.95rem;
+            cursor: pointer;
+            outline: none;
+        }
+
+        select:focus {
+            border-color: var(--accent);
+        }
+
+        button.primary {
+            background-color: var(--accent);
+            border-color: var(--accent);
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        
+        button.primary:hover {
+            background-color: #2563eb;
+        }
+
+        textarea {
+            flex-grow: 1;
+            width: 100%;
+            padding: 20px;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            border: none;
+            resize: none;
+            font-family: monospace;
+            font-size: 1rem;
+            line-height: 1.5;
+            outline: none;
+        }
+
+        /* RIGHT PREVIEW PANEL */
+        #preview-area {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 40px;
+        }
+
+        /* A4 PAPER STYLES */
+        .paper-page {
+            width: 794px; /* A4 width at 96 DPI */
+            height: 1123px; /* A4 height at 96 DPI */
+            background-color: #fff;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            position: relative;
+            flex-shrink: 0;
+            padding: 60px 50px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        /* CSS Paper Backgrounds */
+        .bg-lined {
+            background-image: linear-gradient(transparent 95%, #cbd5e1 95%);
+            background-size: 100% 32px;
+            background-position: 0 10px; /* Align lines */
+        }
+        /* Vertical left margin line for lined paper */
+        .bg-lined::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 80px;
+            width: 2px;
+            background-color: rgba(239, 68, 68, 0.4); /* Faint red line */
+            z-index: 1;
+        }
+
+        .bg-grid {
+            background-image: 
+                linear-gradient(transparent 95%, #cbd5e1 95%),
+                linear-gradient(90deg, transparent 95%, #cbd5e1 95%);
+            background-size: 32px 32px;
+        }
+
+        .bg-plain {
+            background-color: #fffaf0; /* Slightly warm off-white */
+        }
+
+        /* Text Content Container inside Paper */
+        .paper-content {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            height: 100%; /* Total height minus padding */
+            line-height: 32px; /* Matches lined/grid background size perfectly */
+            font-size: 22px;
+            word-wrap: break-word;
+            overflow: hidden;
+        }
+
+        /* Inline Word Scribble Effect */
+        .scribble-word {
+            display: inline-block;
+            white-space: pre;
+            /* Transform injected via JS */
+        }
+
+        .paragraph {
+            margin-bottom: 0px; 
+            min-height: 32px; /* Ensure empty paragraphs take exactly one line */
+        }
+
+        /* --- PRINT STYLES --- */
+        @media print {
+            body {
+                background: none;
+            }
+            #sidebar {
+                display: none !important;
+            }
+            #preview-area {
+                padding: 0;
+                gap: 0;
+                overflow: visible;
+                display: block;
+            }
+            .paper-page {
+                box-shadow: none;
+                margin: 0;
+                page-break-after: always;
+                break-after: page;
+            }
+            /* Remove standard page margins */
+            @page {
+                size: A4;
+                margin: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Left Controls Panel -->
+    <div id="sidebar" class="print-hide">
+        <div class="header">
+            <h1>Scribbly Notes</h1>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>Handwriting Style</label>
+                <select id="font-select">
+                    <option value="'Handwriting 1'">Style 1 (Neat Print)</option>
+                    <option value="'Handwriting 2'">Style 2 (Casual Marker)</option>
+                    <option value="'Handwriting 3'">Style 3 (Cursive Script)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>Ink Color</label>
+                <select id="color-select">
+                    <option value="var(--ink-blue)">Classic Blue</option>
+                    <option value="var(--ink-black)">Jet Black</option>
+                    <option value="var(--ink-red)">Correction Red</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>Paper Type</label>
+                <select id="paper-select">
+                    <option value="bg-lined">Lined Rule</option>
+                    <option value="bg-grid">Grid Paper</option>
+                    <option value="bg-plain">Plain Paper</option>
+                </select>
+            </div>
+
+            <button class="primary" onclick="window.print()">Export to PDF</button>
+        </div>
+
+        <textarea id="text-input" placeholder="Start typing your notes here..."></textarea>
+    </div>
+
+    <!-- Right Preview Panel -->
+    <div id="preview-area">
+        <!-- Pages will be dynamically generated here -->
+    </div>
+
+    <!-- Application Logic -->
+    <script>
+        const textInput = document.getElementById('text-input');
+        const previewArea = document.getElementById('preview-area');
+        const fontSelect = document.getElementById('font-select');
+        const colorSelect = document.getElementById('color-select');
+        const paperSelect = document.getElementById('paper-select');
+
+        // State variables
+        let currentFont = fontSelect.value;
+        let currentColor = colorSelect.value;
+        let currentPaperClass = paperSelect.value;
+
+        // Random transform generator for the handwriting effect (±1deg, ±1px)
+        function getRandomTransform() {
+            const rot = (Math.random() * 2 - 1).toFixed(2);
+            const x = (Math.random() * 2 - 1).toFixed(2);
+            const y = (Math.random() * 2 - 1).toFixed(2);
+            return `rotate(${rot}deg) translate(${x}px, ${y}px)`;
+        }
+
+        // Initialize empty paper page
+        function createNewPage() {
+            const page = document.createElement('div');
+            page.className = `paper-page ${currentPaperClass}`;
+            
+            const content = document.createElement('div');
+            content.className = 'paper-content';
+            content.style.fontFamily = currentFont;
+            content.style.color = currentColor;
+            
+            // Adjust padding based on paper type (lined paper needs margin for the vertical rule)
+            if (currentPaperClass === 'bg-lined') {
+                content.style.paddingLeft = '50px';
+            } else {
+                content.style.paddingLeft = '0px';
+            }
+
+            page.appendChild(content);
+            previewArea.appendChild(page);
+            return content; // Return inner container for text appending
+        }
+
+        // Update styling properties across all pages without re-rendering text
+        function updatePageStyles() {
+            currentFont = fontSelect.value;
+            currentColor = colorSelect.value;
+            const newPaperClass = paperSelect.value;
+
+            const pages = document.querySelectorAll('.paper-page');
+            pages.forEach(page => {
+                // Update paper background
+                page.className = `paper-page ${newPaperClass}`;
+                
+                // Update text content styles
+                const content = page.querySelector('.paper-content');
+                content.style.fontFamily = currentFont;
+                content.style.color = currentColor;
+                
+                if (newPaperClass === 'bg-lined') {
+                    content.style.paddingLeft = '50px';
+                } else {
+                    content.style.paddingLeft = '0px';
+                }
+            });
+            
+            currentPaperClass = newPaperClass;
+        }
+
+        // Pagination and rendering logic
+        function renderNotes() {
+            const text = textInput.value;
+            previewArea.innerHTML = ''; // Clear preview
+            
+            if (text.trim() === '') {
+                createNewPage();
+                return;
+            }
+
+            let currentContainer = createNewPage();
+            
+            // Split text by new lines to maintain paragraphs
+            const paragraphs = text.split('\n');
+
+            paragraphs.forEach((para, index) => {
+                const pEl = document.createElement('div');
+                pEl.className = 'paragraph';
+                currentContainer.appendChild(pEl);
+
+                // Handle empty lines (user hit Enter twice)
+                if (para === '') {
+                    // Force height check for empty lines
+                    if (currentContainer.scrollHeight > currentContainer.clientHeight) {
+                        currentContainer.removeChild(pEl);
+                        currentContainer = createNewPage();
+                        currentContainer.appendChild(pEl);
+                    }
+                    return; 
+                }
+
+                // Split paragraph into words to apply individual transformations
+                const words = para.split(' ');
+                
+                words.forEach(word => {
+                    const span = document.createElement('span');
+                    span.className = 'scribble-word';
+                    span.textContent = word + ' ';
+                    span.style.transform = getRandomTransform();
+                    
+                    pEl.appendChild(span);
+
+                    // --- Core Pagination Check ---
+                    // If appending this word causes overflow, move it to the next page
+                    if (currentContainer.scrollHeight > currentContainer.clientHeight) {
+                        pEl.removeChild(span); // Remove from overflown container
+                        
+                        // Check if paragraph is now empty, if so, remove it to prevent blank gaps
+                        if (pEl.childNodes.length === 0) {
+                            currentContainer.removeChild(pEl);
+                        }
+
+                        // Create new page and reset context
+                        currentContainer = createNewPage();
+                        
+                        // Create a new paragraph container on the new page
+                        const newPEl = document.createElement('div');
+                        newPEl.className = 'paragraph';
+                        newPEl.appendChild(span);
+                        currentContainer.appendChild(newPEl);
+                        
+                        // We must re-assign pEl reference so subsequent words in this para go to the new page
+                        // BUT JavaScript uses block scope, so we can't directly assign to pEl safely if we intend 
+                        // to keep appending. Since we are inside a forEach loop over words, we need a slight refactor 
+                        // to the logic. 
+                    }
+                });
+            });
+        }
+        
+        // Improved rendering logic to fix scope issue on overflow
+        function improvedRenderNotes() {
+             const text = textInput.value;
+            previewArea.innerHTML = '';
+            
+            if (text === '') {
+                createNewPage();
+                return;
+            }
+
+            let currentContainer = createNewPage();
+            const paragraphs = text.split('\n');
+
+            for (let i = 0; i < paragraphs.length; i++) {
+                const para = paragraphs[i];
+                let currentParagraphEl = document.createElement('div');
+                currentParagraphEl.className = 'paragraph';
+                currentContainer.appendChild(currentParagraphEl);
+
+                if (para === '') {
+                     if (currentContainer.scrollHeight > currentContainer.clientHeight) {
+                        currentContainer.removeChild(currentParagraphEl);
+                        currentContainer = createNewPage();
+                        currentContainer.appendChild(currentParagraphEl);
+                    }
+                    continue;
+                }
+
+                const words = para.split(' ');
+                
+                for (let j = 0; j < words.length; j++) {
+                    const word = words[j];
+                    const span = document.createElement('span');
+                    span.className = 'scribble-word';
+                    span.textContent = word + ' ';
+                    span.style.transform = getRandomTransform();
+                    
+                    currentParagraphEl.appendChild(span);
+
+                    if (currentContainer.scrollHeight > currentContainer.clientHeight) {
+                        currentParagraphEl.removeChild(span);
+                        
+                        if (currentParagraphEl.childNodes.length === 0) {
+                            currentContainer.removeChild(currentParagraphEl);
+                        }
+
+                        currentContainer = createNewPage();
+                        currentParagraphEl = document.createElement('div');
+                        currentParagraphEl.className = 'paragraph';
+                        currentParagraphEl.appendChild(span);
+                        currentContainer.appendChild(currentParagraphEl);
+                    }
+                }
+            }
+        }
+
+        // Debounce render to improve performance while typing
+        let debounceTimer;
+        textInput.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(improvedRenderNotes, 150);
+        });
+
+        // Event listeners for style changes
+        fontSelect.addEventListener('change', updatePageStyles);
+        colorSelect.addEventListener('change', updatePageStyles);
+        paperSelect.addEventListener('change', updatePageStyles);
+
+        // Initial setup
+        textInput.value = "Hello!\n\nThis is Scribbly Notes.\nIt turns text into realistic handwriting that spans seamlessly across multiple A4 pages.\n\nKeep typing to see the auto-pagination in action!";
+        improvedRenderNotes();
+
+    </script>
+</body>
+</html>

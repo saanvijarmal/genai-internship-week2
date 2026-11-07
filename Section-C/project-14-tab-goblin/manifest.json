@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Tab Goblin",
+  "version": "1.0",
+  "description": "Manage tab overload by feeding idle tabs to the Tab Goblin to free up system memory.",
+  "permissions": ["tabs", "storage", "tabGroups"],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

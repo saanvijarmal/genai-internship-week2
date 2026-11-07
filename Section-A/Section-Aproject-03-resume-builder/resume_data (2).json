@@ -1,0 +1,56 @@
+{
+  "template": "minimal",
+  "order": [
+    "experience",
+    "education",
+    "projects",
+    "skills"
+  ],
+  "personal": {
+    "name": "Saanvi Jarmal",
+    "title": "Student",
+    "email": "sj8066@srmist.edu.in",
+    "phone": "98459670435",
+    "linkedin": "linkedin.com/in/saanvijarmal",
+    "website": "",
+    "summary": "Interested in how technology helps frame business decisions"
+  },
+  "experience": [
+    {
+      "id": "ae3o836un",
+      "title": "HR Intern",
+      "company": "Cherry+ Network",
+      "dates": "October 2025 - February 2026",
+      "description": "Helped organize events, handled HR tasks"
+    }
+  ],
+  "education": [
+    {
+      "id": "35mb536qj",
+      "degree": "B.Tech CSBS",
+      "school": "SRMIST",
+      "dates": "2025-2029"
+    },
+    {
+      "id": "yryroppp3",
+      "degree": "High School",
+      "school": "DPS East",
+      "dates": ""
+    }
+  ],
+  "projects": [
+    {
+      "id": "qrs9p3l47",
+      "name": "E-commerce Platform",
+      "description": "Built a scalable e-commerce platform using Node.js and Tailwind CSS, handling over 10,000 monthly active users."
+    }
+  ],
+  "skills": [
+    "JavaScript",
+    "React",
+    "Node.js",
+    "Tailwind CSS",
+    "SQL",
+    "Git"
+  ]
+}

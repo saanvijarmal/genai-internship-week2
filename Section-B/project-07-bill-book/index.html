@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bill Book PWA</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- QRCode JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- html2canvas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <style>
+        /* Custom styling for app-like experience */
+        body {
+            background-color: #f3f4f6; /* Tailwind gray-100 */
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Screen transitions */
+        .screen {
+            display: none;
+            animation: fadeIn 0.2s ease-in-out;
+        }
+        .screen.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Bottom Nav Active State */
+        .nav-item.active {
+            color: #3b82f6; /* Tailwind blue-500 */
+        }
+        
+        /* Mobile container constraints */
+        .app-container {
+            max-width: 480px;
+            margin: 0 auto;
+            background-color: white;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+            position: relative;
+        }
+    </style>
+</head>
+<body class="text-gray-800 font-sans antialiased selection:bg-blue-200">
+
+    <div class="app-container">
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-y-auto hide-scrollbar pb-20">
+            
+            <!-- ================= SCREEN 1: PROFILE & INVENTORY ================= -->
+            <div id="screen-profile" class="screen active p-4">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Shop Setup</h2>
+                
+                <!-- Profile Form -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+                    <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Shop Details</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Shop Name</label>
+                            <input type="text" id="shop-name" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. Super Mart">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Phone Number</label>
+                            <input type="tel" id="shop-phone" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. 9876543210">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">UPI ID (For QR)</label>
+                            <input type="text" id="shop-upi" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. shop@upi">
+                        </div>
+                        <button onclick="saveProfile()" class="w-full bg-gray-900 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-gray-800 active:scale-95 transition-transform">Save Details</button>
+                    </div>
+                </div>
+
+                <!-- Inventory Form -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                    <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Inventory List</h3>
+                    
+                    <div class="flex gap-2 mb-4">
+                        <input type="text" id="item-name" class="flex-1 border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Item Name">
+                        <input type="number" id="item-price" class="w-24 border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="₹ Price">
+                        <button onclick="addInventoryItem()" class="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 active:scale-95 transition-transform flex items-center justify-center">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        </button>
+                    </div>
+
+                    <!-- Inventory List -->
+                    <div id="inventory-list" class="space-y-2 max-h-60 overflow-y-auto">
+                        <!-- Items injected via JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= SCREEN 2: CREATE BILL ================= -->
+            <div id="screen-bill" class="screen p-4 flex flex-col h-full">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">Create Bill</h2>
+                
+                <div class="flex-1 overflow-y-auto hide-scrollbar bg-white rounded-xl shadow-sm border border-gray-100 p-2 mb-4">
+                    <!-- Bill Items Selection -->
+                    <div id="bill-inventory-list" class="space-y-2">
+                        <!-- Items injected via JS -->
+                    </div>
+                    <div id="empty-inventory-msg" class="text-center text-gray-400 text-sm py-8 hidden">
+                        Add items in Profile & Inventory first.
+                    </div>
+                </div>
+
+                <!-- Bill Calculations -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 space-y-3">
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-gray-600">Subtotal:</span>
+                        <span class="font-medium" id="bill-subtotal">₹0.00</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="flex-1">
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Discount (%)</label>
+                            <input type="number" id="bill-discount" value="0" class="w-full border border-gray-300 rounded-lg p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none text-center" oninput="calculateBillTotal()">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Tax/GST (%)</label>
+                            <input type="number" id="bill-tax" value="0" class="w-full border border-gray-300 rounded-lg p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none text-center" oninput="calculateBillTotal()">
+                        </div>
+                    </div>
+                    <div class="border-t border-dashed border-gray-300 pt-3 flex items-center justify-between">
+                        <span class="text-lg font-bold text-gray-800">Total:</span>
+                        <span class="text-2xl font-black text-blue-600" id="bill-final-total">₹0.00</span>
+                    </div>
+                    
+                    <button id="btn-proceed" onclick="proceedToCheckout()" class="w-full bg-blue-600 text-white rounded-xl py-3.5 text-sm font-bold shadow-lg shadow-blue-200 mt-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Proceed to Checkout
+                    </button>
+                </div>
+            </div>
+
+            <!-- ================= SCREEN 3: CHECKOUT / PAY ================= -->
+            <div id="screen-checkout" class="screen p-4 bg-gray-50 min-h-full">
+                <!-- Bill Card (Target for html2canvas) -->
+                <div id="printable-bill" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 mb-6 relative overflow-hidden">
+                    <!-- Decor pattern -->
+                    <div class="absolute top-0 right-0 w-20 h-20 bg-blue-50 rounded-bl-full -z-10"></div>
+                    
+                    <div class="text-center mb-6">
+                        <h2 id="checkout-shop-name" class="text-2xl font-black text-gray-800 tracking-tight">Shop Name</h2>
+                        <p id="checkout-shop-phone" class="text-sm text-gray-500 mt-1">Ph: --</p>
+                        <div class="text-xs text-gray-400 mt-2" id="checkout-date">Date: --</div>
+                    </div>
+                    
+                    <div class="border-y border-dashed border-gray-200 py-4 mb-4">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="text-left text-gray-500">
+                                    <th class="font-medium pb-2">Item</th>
+                                    <th class="font-medium pb-2 text-center">Qty</th>
+                                    <th class="font-medium pb-2 text-right">Price</th>
+                                </tr>
+                            </thead>
+                            <tbody id="checkout-items-list" class="text-gray-700">
+                                <!-- Injected via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="space-y-2 text-sm text-gray-600">
+                        <div class="flex justify-between">
+                            <span>Subtotal</span>
+                            <span id="checkout-subtotal">₹0.00</span>
+                        </div>
+                        <div class="flex justify-between text-green-600" id="checkout-discount-row">
+                            <span>Discount</span>
+                            <span id="checkout-discount">- ₹0.00</span>
+                        </div>
+                        <div class="flex justify-between text-red-500" id="checkout-tax-row">
+                            <span>Tax/GST</span>
+                            <span id="checkout-tax">+ ₹0.00</span>
+                        </div>
+                        <div class="border-t border-gray-800 pt-2 mt-2 flex justify-between items-end">
+                            <span class="font-bold text-gray-800">Total Amount</span>
+                            <span class="text-xl font-black text-gray-900" id="checkout-total">₹0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- QR Code Section -->
+                    <div class="mt-8 flex flex-col items-center">
+                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">Scan to Pay</p>
+                        <div id="qrcode-container" class="bg-white p-2 rounded-xl border border-gray-200 shadow-sm"></div>
+                        <p id="upi-warning" class="text-xs text-red-500 mt-2 hidden">UPI ID not set in profile.</p>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="grid grid-cols-2 gap-3 mb-6">
+                    <button onclick="shareOnWhatsApp()" class="flex items-center justify-center gap-2 bg-[#25D366] text-white py-3 rounded-xl font-semibold shadow-sm active:scale-95 transition-transform">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+                        WhatsApp
+                    </button>
+                    <button onclick="downloadBillAsImage()" class="flex items-center justify-center gap-2 bg-gray-800 text-white py-3 rounded-xl font-semibold shadow-sm active:scale-95 transition-transform">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Save Image
+                    </button>
+                </div>
+                
+                <button onclick="saveBillAndReset()" class="w-full bg-blue-600 text-white rounded-xl py-4 text-sm font-bold shadow-lg shadow-blue-200 active:scale-95 transition-transform">
+                    Mark as Paid & Close
+                </button>
+            </div>
+
+            <!-- ================= SCREEN 4: HISTORY ================= -->
+            <div id="screen-history" class="screen p-4">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Bill History</h2>
+
+                <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-5 text-white shadow-lg mb-6 relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-white opacity-10 rounded-full"></div>
+                    <p class="text-blue-100 text-sm font-medium mb-1">Today's Sales</p>
+                    <h3 class="text-4xl font-black tracking-tight" id="history-today-total">₹0.00</h3>
+                </div>
+
+                <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Past Invoices</h4>
+                <div id="history-list" class="space-y-3">
+                    <!-- History items injected via JS -->
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Bottom Navigation Bar -->
+        <nav class="fixed bottom-0 w-full max-w-[480px] bg-white border-t border-gray-200 shadow-[0_-4px_10px_rgba(0,0,0,0.02)] flex justify-around items-center h-16 z-50 rounded-t-2xl">
+            <button class="nav-item active flex flex-col items-center justify-center w-full h-full text-gray-400 transition-colors" onclick="switchScreen('profile', this)">
+                <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                <span class="text-[10px] font-semibold">Profile</span>
+            </button>
+            <button class="nav-item flex flex-col items-center justify-center w-full h-full text-gray-400 transition-colors" onclick="switchScreen('bill', this)">
+                <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                <span class="text-[10px] font-semibold">Bill</span>
+            </button>
+            <button class="nav-item flex flex-col items-center justify-center w-full h-full text-gray-400 transition-colors" onclick="switchScreen('history', this)">
+                <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span class="text-[10px] font-semibold">History</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // ================= STATE MANAGEMENT =================
+        const STORAGE_KEYS = {
+            PROFILE: 'billBook_profile',
+            INVENTORY: 'billBook_inventory',
+            HISTORY: 'billBook_history'
+        };
+
+        let profile = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROFILE)) || { name: '', phone: '', upi: '' };
+        let inventory = JSON.parse(localStorage.getItem(STORAGE_KEYS.INVENTORY)) || [];
+        let historyData = JSON.parse(localStorage.getItem(STORAGE_KEYS.HISTORY)) || [];
+        
+        // Current volatile bill state
+        let currentBill = {
+            items: {}, // key: item_id, value: { item, qty }
+            discount: 0,
+            tax: 0,
+            subtotal: 0,
+            total: 0
+        };
+
+        let qrCodeInstance = null;
+
+        // ================= INITIALIZATION =================
+        function initApp() {
+            // Load Profile Data
+            document.getElementById('shop-name').value = profile.name;
+            document.getElementById('shop-phone').value = profile.phone;
+            document.getElementById('shop-upi').value = profile.upi;
+
+            renderInventory();
+            renderHistory();
+        }
+
+        // ================= NAVIGATION =================
+        function switchScreen(screenId, btnElem) {
+            // Hide all screens
+            document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+            // Remove active from nav
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            
+            // Show target
+            document.getElementById(`screen-${screenId}`).classList.add('active');
+            
+            // Set nav active if invoked from nav bar
+            if(btnElem) btnElem.classList.add('active');
+
+            // Specific Screen Hooks
+            if(screenId === 'bill') {
+                renderBillInventory();
+            }
+            if(screenId === 'history') {
+                renderHistory();
+            }
+        }
+
+        // ================= PROFILE & INVENTORY =================
+        function saveProfile() {
+            profile = {
+                name: document.getElementById('shop-name').value.trim(),
+                phone: document.getElementById('shop-phone').value.trim(),
+                upi: document.getElementById('shop-upi').value.trim()
+            };
+            localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+            alert('Shop details saved successfully!');
+        }
+
+        function addInventoryItem() {
+            const nameInput = document.getElementById('item-name');
+            const priceInput = document.getElementById('item-price');
+            const name = nameInput.value.trim();
+            const price = parseFloat(priceInput.value);
+
+            if (!name || isNaN(price) || price < 0) {
+                alert('Please enter a valid item name and positive price.');
+                return;
+            }
+
+            const newItem = { id: Date.now().toString(), name, price };
+            inventory.push(newItem);
+            localStorage.setItem(STORAGE_KEYS.INVENTORY, JSON.stringify(inventory));
+            
+            nameInput.value = '';
+            priceInput.value = '';
+            renderInventory();
+        }
+
+        function removeInventoryItem(id) {
+            if(confirm('Delete this item?')) {
+                inventory = inventory.filter(item => item.id !== id);
+                localStorage.setItem(STORAGE_KEYS.INVENTORY, JSON.stringify(inventory));
+                
+                // Also remove from current bill if exists
+                if(currentBill.items[id]) {
+                    delete currentBill.items[id];
+                    calculateBillTotal();
+                }
+                renderInventory();
+            }
+        }
+
+        function renderInventory() {
+            const list = document.getElementById('inventory-list');
+            list.innerHTML = '';
+            
+            if(inventory.length === 0) {
+                list.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">No items added yet.</p>';
+                return;
+            }
+
+            inventory.forEach(item => {
+                const el = document.createElement('div');
+                el.className = 'flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100';
+                el.innerHTML = `
+                    <div>
+                        <p class="text-sm font-semibold text-gray-800">${item.name}</p>
+                        <p class="text-xs text-gray-500">₹${item.price.toFixed(2)}</p>
+                    </div>
+                    <button onclick="removeInventoryItem('${item.id}')" class="text-red-400 hover:text-red-600 p-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                `;
+                list.appendChild(el);
+            });
+        }
+
+        // ================= CREATE BILL =================
+        function renderBillInventory() {
+            const list = document.getElementById('bill-inventory-list');
+            const emptyMsg = document.getElementById('empty-inventory-msg');
+            list.innerHTML = '';
+
+            if (inventory.length === 0) {
+                emptyMsg.classList.remove('hidden');
+                return;
+            } else {
+                emptyMsg.classList.add('hidden');
+            }
+
+            inventory.forEach(item => {
+                const qty = currentBill.items[item.id] ? currentBill.items[item.id].qty : 0;
+                const el = document.createElement('div');
+                el.className = 'flex justify-between items-center p-3 border-b border-gray-100 last:border-0';
+                el.innerHTML = `
+                    <div class="flex-1">
+                        <p class="text-sm font-semibold text-gray-800">${item.name}</p>
+                        <p class="text-xs text-gray-500">₹${item.price.toFixed(2)}</p>
+                    </div>
+                    <div class="flex items-center gap-3 bg-gray-50 rounded-lg p-1 border border-gray-200">
+                        <button onclick="updateQty('${item.id}', -1)" class="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded-md active:bg-gray-300">-</button>
+                        <span class="text-sm font-bold w-4 text-center" id="qty-${item.id}">${qty}</span>
+                        <button onclick="updateQty('${item.id}', 1)" class="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded-md active:bg-gray-300">+</button>
+                    </div>
+                `;
+                list.appendChild(el);
+            });
+            calculateBillTotal();
+        }
+
+        function updateQty(itemId, delta) {
+            if (!currentBill.items[itemId]) {
+                const itemDef = inventory.find(i => i.id === itemId);
+                if(itemDef) currentBill.items[itemId] = { item: itemDef, qty: 0 };
+            }
+
+            let newQty = currentBill.items[itemId].qty + delta;
+            if (newQty < 0) newQty = 0;
+
+            currentBill.items[itemId].qty = newQty;
+            
+            // Clean up 0 qty
+            if(newQty === 0) {
+                delete currentBill.items[itemId];
+            }
+
+            document.getElementById(`qty-${itemId}`).innerText = newQty;
+            calculateBillTotal();
+        }
+
+        function calculateBillTotal() {
+            let subtotal = 0;
+            let totalItems = 0;
+            
+            Object.values(currentBill.items).forEach(entry => {
+                subtotal += (entry.item.price * entry.qty);
+                totalItems += entry.qty;
+            });
+
+            const discountPct = parseFloat(document.getElementById('bill-discount').value) || 0;
+            const taxPct = parseFloat(document.getElementById('bill-tax').value) || 0;
+
+            const discountAmt = subtotal * (discountPct / 100);
+            const afterDiscount = subtotal - discountAmt;
+            const taxAmt = afterDiscount * (taxPct / 100);
+            const finalTotal = afterDiscount + taxAmt;
+
+            currentBill.subtotal = subtotal;
+            currentBill.discount = discountAmt;
+            currentBill.tax = taxAmt;
+            currentBill.total = finalTotal;
+
+            document.getElementById('bill-subtotal').innerText = `₹${subtotal.toFixed(2)}`;
+            document.getElementById('bill-final-total').innerText = `₹${finalTotal.toFixed(2)}`;
+
+            const btnProceed = document.getElementById('btn-proceed');
+            btnProceed.disabled = totalItems === 0;
+        }
+
+        // ================= CHECKOUT / PAY =================
+        function proceedToCheckout() {
+            switchScreen('checkout');
+
+            // Populate Bill UI
+            document.getElementById('checkout-shop-name').innerText = profile.name || 'My Shop';
+            document.getElementById('checkout-shop-phone').innerText = profile.phone ? `Ph: ${profile.phone}` : '';
+            document.getElementById('checkout-date').innerText = new Date().toLocaleString();
+
+            const tbody = document.getElementById('checkout-items-list');
+            tbody.innerHTML = '';
+            
+            Object.values(currentBill.items).forEach(entry => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-1.5 font-medium">${entry.item.name}</td>
+                    <td class="py-1.5 text-center text-gray-500">x${entry.qty}</td>
+                    <td class="py-1.5 text-right font-medium">₹${(entry.item.price * entry.qty).toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('checkout-subtotal').innerText = `₹${currentBill.subtotal.toFixed(2)}`;
+            
+            const discRow = document.getElementById('checkout-discount-row');
+            if(currentBill.discount > 0) {
+                discRow.classList.remove('hidden');
+                document.getElementById('checkout-discount').innerText = `- ₹${currentBill.discount.toFixed(2)}`;
+            } else { discRow.classList.add('hidden'); }
+
+            const taxRow = document.getElementById('checkout-tax-row');
+            if(currentBill.tax > 0) {
+                taxRow.classList.remove('hidden');
+                document.getElementById('checkout-tax').innerText = `+ ₹${currentBill.tax.toFixed(2)}`;
+            } else { taxRow.classList.add('hidden'); }
+
+            document.getElementById('checkout-total').innerText = `₹${currentBill.total.toFixed(2)}`;
+
+            // Generate QR Code
+            generateQRCode();
+        }
+
+        function generateQRCode() {
+            const container = document.getElementById('qrcode-container');
+            const warning = document.getElementById('upi-warning');
+            container.innerHTML = '';
+
+            if(!profile.upi) {
+                warning.classList.remove('hidden');
+                return;
+            }
+            warning.classList.add('hidden');
+
+            // Format: upi://pay?pa=UPI_ID&pn=NAME&am=AMOUNT
+            const upiString = `upi://pay?pa=${profile.upi}&pn=${encodeURIComponent(profile.name)}&am=${currentBill.total.toFixed(2)}&cu=INR`;
+            
+            qrCodeInstance = new QRCode(container, {
+                text: upiString,
+                width: 160,
+                height: 160,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+        }
+
+        function shareOnWhatsApp() {
+            if(Object.keys(currentBill.items).length === 0) return;
+
+            let text = `*Bill from ${profile.name || 'Our Shop'}*\n`;
+            text += `Date: ${new Date().toLocaleDateString()}\n\n`;
+            
+            Object.values(currentBill.items).forEach(entry => {
+                text += `${entry.item.name} (x${entry.qty}): ₹${(entry.item.price * entry.qty).toFixed(2)}\n`;
+            });
+
+            text += `\nSubtotal: ₹${currentBill.subtotal.toFixed(2)}\n`;
+            if(currentBill.discount > 0) text += `Discount: -₹${currentBill.discount.toFixed(2)}\n`;
+            if(currentBill.tax > 0) text += `Tax/GST: +₹${currentBill.tax.toFixed(2)}\n`;
+            text += `*Total Amount: ₹${currentBill.total.toFixed(2)}*\n\n`;
+            text += `Thank you for visiting!`;
+
+            const encoded = encodeURIComponent(text);
+            window.open(`https://wa.me/?text=${encoded}`, '_blank');
+        }
+
+        function downloadBillAsImage() {
+            const billElem = document.getElementById('printable-bill');
+            
+            // html2canvas converts DOM to canvas
+            html2canvas(billElem, { scale: 2, useCORS: true }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `Bill_${Date.now()}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }).catch(err => {
+                console.error("Error generating image", err);
+                alert("Failed to save image.");
+            });
+        }
+
+        function saveBillAndReset() {
+            // Save to history
+            const finalInvoice = {
+                id: Date.now().toString(),
+                date: new Date().toISOString(),
+                items: JSON.parse(JSON.stringify(currentBill.items)), // deep copy
+                subtotal: currentBill.subtotal,
+                discount: currentBill.discount,
+                tax: currentBill.tax,
+                total: currentBill.total
+            };
+
+            historyData.unshift(finalInvoice); // Add to top
+            localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(historyData));
+
+            // Reset current bill
+            currentBill = { items: {}, discount: 0, tax: 0, subtotal: 0, total: 0 };
+            document.getElementById('bill-discount').value = 0;
+            document.getElementById('bill-tax').value = 0;
+            
+            alert('Bill saved successfully!');
+            switchScreen('history', document.querySelectorAll('.nav-item')[2]);
+        }
+
+        // ================= HISTORY =================
+        function renderHistory() {
+            const list = document.getElementById('history-list');
+            list.innerHTML = '';
+            
+            let todayTotal = 0;
+            const todayStr = new Date().toDateString();
+
+            if(historyData.length === 0) {
+                list.innerHTML = '<div class="text-center text-gray-400 py-8 text-sm bg-gray-50 rounded-xl border border-dashed border-gray-200">No past invoices found.</div>';
+            }
+
+            historyData.forEach(bill => {
+                const billDate = new Date(bill.date);
+                if(billDate.toDateString() === todayStr) {
+                    todayTotal += bill.total;
+                }
+
+                // Determine item summary string
+                const itemsCount = Object.keys(bill.items).length;
+                const firstItemName = Object.values(bill.items)[0]?.item.name || 'Unknown';
+                const summaryTxt = itemsCount > 1 ? `${firstItemName} +${itemsCount - 1} more` : firstItemName;
+
+                const el = document.createElement('div');
+                el.className = 'bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center';
+                el.innerHTML = `
+                    <div>
+                        <p class="text-xs text-gray-500 mb-1">${billDate.toLocaleDateString()} • ${billDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                        <p class="text-sm font-semibold text-gray-800 line-clamp-1">${summaryTxt}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-lg font-bold text-gray-900">₹${bill.total.toFixed(2)}</p>
+                    </div>
+                `;
+                list.appendChild(el);
+            });
+
+            // Animate number count up
+            document.getElementById('history-today-total').innerText = `₹${todayTotal.toFixed(2)}`;
+        }
+
+        // Boot
+        window.onload = initApp;
+    </script>
+</body>
+</html>

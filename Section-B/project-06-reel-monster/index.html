@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Reel Monster Prototype</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom scrollbar to simulate mobile hiding */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Snap scrolling for realistic Reel feel */
+        .snap-y-mandatory { scroll-snap-type: y mandatory; }
+        .snap-always { scroll-snap-align: start; scroll-snap-stop: always; }
+        
+        /* Smooth UI/UX Animations */
+        @keyframes breathe {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-5px) scale(1.03); }
+        }
+        .animate-breathe { animation: breathe 3s ease-in-out infinite; }
+        
+        @keyframes pop {
+            0% { transform: scale(0.8); opacity: 0; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop { animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        
+        /* Tooltips & Speech Bubbles */
+        .speech-bubble {
+            position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+            margin-bottom: 12px; padding: 10px 14px; background: white; color: black;
+            border-radius: 16px; font-size: 14px; font-weight: bold; white-space: nowrap;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2); opacity: 0; pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s ease; z-index: 60;
+        }
+        .speech-bubble::after {
+            content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+            border-width: 6px; border-style: solid; border-color: white transparent transparent transparent;
+        }
+        .speech-bubble.show { opacity: 1; transform: translateX(-50%) translateY(-5px); }
+        
+        .bar-fill { transition: height 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+        
+        /* Draggable Wrapper Layout */
+        #draggable-wrapper {
+            position: absolute; bottom: 96px; right: 16px; touch-action: none; z-index: 40; user-select: none;
+        }
+
+        /* Dark-mode polished gradients for feed placeholders */
+        .feed-gradient-1 { background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%); }
+        .feed-gradient-2 { background: linear-gradient(135deg, #312e81 0%, #1e1b4b 100%); }
+        .feed-gradient-3 { background: linear-gradient(135deg, #172554 0%, #0f172a 100%); }
+    </style>
+</head>
+<body class="bg-slate-900 h-screen w-full flex items-center justify-center font-sans overflow-hidden">
+    <!-- Mobile Phone Container -->
+    <div id="phone-container" class="relative w-[360px] h-[780px] bg-black rounded-[40px] border-[8px] border-slate-800 shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col">
+        
+        <!-- Phone Notch / Status Bar -->
+        <div class="absolute top-0 inset-x-0 h-6 bg-transparent z-50 flex justify-center">
+            <div class="w-1/2 h-5 bg-slate-800 rounded-b-2xl"></div>
+        </div>
+
+        <!-- Controls Overlay -->
+        <div class="absolute top-10 left-4 right-4 z-40 flex justify-between items-center">
+            <div class="bg-black/60 backdrop-blur-md rounded-full px-3 py-1 flex items-center gap-2 border border-white/20 shadow-lg">
+                <button id="btn-lvl1" class="text-xs font-bold text-white bg-blue-600 px-3 py-1.5 rounded-full transition-colors">Lvl 1 (Tap)</button>
+                <button id="btn-lvl2" class="text-xs font-bold text-gray-400 px-3 py-1.5 rounded-full transition-colors">Lvl 2 (Scroll)</button>
+            </div>
+            <button id="btn-stats" class="bg-black/60 backdrop-blur-md p-2.5 rounded-full border border-white/20 text-white hover:bg-white/20 transition shadow-lg">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+            </button>
+        </div>
+
+        <!-- Reel Feed -->
+        <div id="feed" class="flex-1 w-full h-full overflow-y-scroll hide-scrollbar snap-y-mandatory bg-black">
+            <!-- Reels injected by JS -->
+        </div>
+
+        <!-- Draggable Floating Monster Overlay -->
+        <div id="draggable-wrapper">
+            <div id="monster-visual" class="animate-breathe transition-transform duration-500 scale-100 relative cursor-grab active:cursor-grabbing">
+                <div id="speech-bubble" class="speech-bubble">Feed me!</div>
+                <div id="monster-emoji" class="text-6xl drop-shadow-[0_10px_15px_rgba(0,0,0,0.5)] filter transition-transform duration-500">👾</div>
+                <!-- Badge -->
+                <div id="reel-badge" class="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold w-7 h-7 flex items-center justify-center rounded-full border-2 border-black shadow-lg animate-pop">0</div>
+            </div>
+        </div>
+
+        <!-- Screen Takeover Overlay (Intervention) -->
+        <div id="takeover-screen" class="absolute inset-0 bg-black/95 backdrop-blur-xl z-[100] hidden flex-col items-center justify-center p-6 text-center transition-opacity duration-500">
+            <div class="text-[140px] leading-none mb-6 drop-shadow-[0_0_40px_rgba(239,68,68,0.6)] animate-breathe">👹</div>
+            <h2 class="text-4xl font-black text-red-500 mb-4 uppercase tracking-widest drop-shadow-md">I ATE ALL<br>YOUR TIME!</h2>
+            <p class="text-lg text-zinc-300 font-medium mb-10 max-w-[280px]">You've reached your doom.<br>Go do something productive!</p>
+            <button id="btn-dismiss-takeover" class="bg-gradient-to-r from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 text-white font-bold py-4 px-10 rounded-full shadow-[0_0_30px_rgba(220,38,38,0.5)] transition-all transform hover:scale-105 active:scale-95 border border-red-400/30">
+                I Promise to Stop
+            </button>
+        </div>
+
+        <!-- Stats Dashboard Modal -->
+        <div id="stats-modal" class="absolute inset-0 bg-slate-900/95 backdrop-blur-xl z-[80] flex flex-col p-6 translate-y-full transition-transform duration-500 ease-in-out">
+            <div class="flex justify-between items-center mb-8 mt-6">
+                <h2 class="text-2xl font-black text-white tracking-wide">Your Stats</h2>
+                <button id="btn-close-stats" class="bg-white/10 hover:bg-white/20 text-white p-2 rounded-full transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-8">
+                <div class="bg-slate-800/80 rounded-2xl p-5 border border-slate-700 shadow-inner">
+                    <p class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Today's Reels</p>
+                    <p id="stat-today" class="text-4xl font-black text-blue-400 drop-shadow-md">0</p>
+                </div>
+                <div class="bg-slate-800/80 rounded-2xl p-5 border border-slate-700 shadow-inner">
+                    <p class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Time Lost</p>
+                    <p id="stat-time" class="text-4xl font-black text-red-400 drop-shadow-md">0<span class="text-xl text-red-400/70 ml-1">m</span></p>
+                </div>
+            </div>
+
+            <h3 class="text-white text-sm font-bold uppercase tracking-widest mb-4 opacity-80">Last 7 Days</h3>
+            <div class="flex-1 bg-slate-800/50 rounded-3xl border border-slate-700 p-5 flex items-end justify-between gap-2 pb-8 relative shadow-lg">
+                <!-- Bar Chart Grid injected by JS -->
+                <div id="chart-container" class="w-full h-full flex items-end justify-between gap-2 pt-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- State & Constants ---
+        let currentMode = 1; // 1: Tap, 2: Scroll
+        let currentCount = 0;
+        let todayDateStr = new Date().toDateString();
+        let watchedReelIds = new Set();
+        let historyData = [];
+        let dismissedTakeovers = 0;
+
+        // DOM Elements
+        const feed = document.getElementById('feed');
+        const dragWrapper = document.getElementById('draggable-wrapper');
+        const monsterVisual = document.getElementById('monster-visual');
+        const monsterEmoji = document.getElementById('monster-emoji');
+        const reelBadge = document.getElementById('reel-badge');
+        const speechBubble = document.getElementById('speech-bubble');
+        const btnLvl1 = document.getElementById('btn-lvl1');
+        const btnLvl2 = document.getElementById('btn-lvl2');
+        const btnStats = document.getElementById('btn-stats');
+        const btnCloseStats = document.getElementById('btn-close-stats');
+        const statsModal = document.getElementById('stats-modal');
+        const chartContainer = document.getElementById('chart-container');
+        const takeoverScreen = document.getElementById('takeover-screen');
+        const btnDismissTakeover = document.getElementById('btn-dismiss-takeover');
+        const phoneContainer = document.getElementById('phone-container');
+        let hideBubbleTimeout;
+
+        // Drag State Variables
+        let isDragging = false;
+        let hasDragMoved = false;
+        let dragStartX, dragStartY, initialLeft, initialTop;
+
+        // --- Initialization ---
+        function init() {
+            loadData();
+            generateFeed(100);
+            updateUI(true); // silent init without popping animations
+            setupListeners();
+            setupIntersectionObserver();
+        }
+
+        // --- Data Management (LocalStorage) ---
+        function loadData() {
+            const savedData = JSON.parse(localStorage.getItem('reelMonsterData')) || {};
+            
+            if (savedData.lastDate !== todayDateStr) {
+                let prevHistory = savedData.history || generateMockHistory();
+                if (savedData.lastDate) {
+                    prevHistory.push(savedData.todayCount || 0);
+                    if (prevHistory.length > 7) prevHistory.shift();
+                }
+                historyData = prevHistory;
+                currentCount = 0;
+                dismissedTakeovers = 0;
+            } else {
+                historyData = savedData.history || generateMockHistory();
+                currentCount = savedData.todayCount || 0;
+                dismissedTakeovers = savedData.dismissedTakeovers || 0;
+            }
+            saveData();
+        }
+
+        function saveData() {
+            localStorage.setItem('reelMonsterData', JSON.stringify({
+                lastDate: todayDateStr,
+                todayCount: currentCount,
+                history: historyData,
+                dismissedTakeovers: dismissedTakeovers
+            }));
+        }
+
+        function generateMockHistory() {
+            return Array.from({length: 7}, () => Math.floor(Math.random() * 40) + 5);
+        }
+
+        // --- UI Updates & Monster Evolution ---
+        function updateUI(isInit = false) {
+            reelBadge.textContent = currentCount;
+            
+            if (!isInit) {
+                // Re-trigger badge animation
+                reelBadge.classList.remove('animate-pop');
+                void reelBadge.offsetWidth;
+                reelBadge.classList.add('animate-pop');
+            }
+
+            // Takeover Check: triggers dynamically at every 7th threshold (7, 14, 21...)
+            let threshold = (dismissedTakeovers + 1) * 7;
+            if (!isInit && currentCount >= threshold) {
+                showTakeover();
+            }
+
+            // Evolve Monster
+            let newEmoji = '👾';
+            let scaleClass = 'scale-100';
+
+            if (currentCount >= 16) {
+                newEmoji = '👹';
+                scaleClass = 'scale-150';
+            } else if (currentCount >= 6) {
+                newEmoji = '😈';
+                scaleClass = 'scale-125';
+            }
+
+            monsterEmoji.textContent = newEmoji;
+            monsterVisual.className = `animate-breathe transition-transform duration-500 relative cursor-grab active:cursor-grabbing ${scaleClass}`;
+        }
+
+        function triggerSpeechBubble() {
+            let message = "Feed me reels!";
+            if (currentCount >= 16) message = "Yum! Your evening tastes great.";
+            else if (currentCount >= 6) message = "Burp. Your homework says hi.";
+            else if (currentCount > 0) message = "More! MORE!";
+
+            speechBubble.textContent = message;
+            speechBubble.classList.add('show');
+            
+            clearTimeout(hideBubbleTimeout);
+            hideBubbleTimeout = setTimeout(() => {
+                speechBubble.classList.remove('show');
+            }, 2500);
+        }
+
+        function incrementCount() {
+            currentCount++;
+            saveData();
+            updateUI();
+            
+            if (currentCount === 1 || currentCount === 6 || currentCount === 16 || Math.random() < 0.3) {
+                triggerSpeechBubble();
+            }
+        }
+
+        function showTakeover() {
+            takeoverScreen.classList.remove('hidden');
+            takeoverScreen.classList.add('flex');
+            feed.style.overflowY = 'hidden'; // Stop scrolling
+        }
+
+        // --- Event Listeners ---
+        function setupListeners() {
+            // Mode Toggles
+            btnLvl1.addEventListener('click', () => setMode(1));
+            btnLvl2.addEventListener('click', () => setMode(2));
+
+            // Dashboard
+            btnStats.addEventListener('click', openStats);
+            btnCloseStats.addEventListener('click', () => {
+                statsModal.classList.add('translate-y-full');
+            });
+
+            // Dismiss Takeover
+            btnDismissTakeover.addEventListener('click', () => {
+                takeoverScreen.classList.add('hidden');
+                takeoverScreen.classList.remove('flex');
+                feed.style.overflowY = 'scroll';
+                dismissedTakeovers++;
+                saveData();
+            });
+
+            // --- Drag & Drop Logic ---
+            dragWrapper.addEventListener('pointerdown', (e) => {
+                isDragging = true;
+                hasDragMoved = false;
+                dragStartX = e.clientX;
+                dragStartY = e.clientY;
+                initialLeft = dragWrapper.offsetLeft;
+                initialTop = dragWrapper.offsetTop;
+                dragWrapper.setPointerCapture(e.pointerId);
+            });
+
+            dragWrapper.addEventListener('pointermove', (e) => {
+                if (!isDragging) return;
+                
+                const dx = e.clientX - dragStartX;
+                const dy = e.clientY - dragStartY;
+                
+                // Allow a small threshold to distinguish a click from a drag
+                if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+                    hasDragMoved = true;
+                }
+                
+                let newLeft = initialLeft + dx;
+                let newTop = initialTop + dy;
+
+                // Keep monster bounded inside the phone layout
+                const maxLeft = phoneContainer.clientWidth - dragWrapper.clientWidth;
+                const maxTop = phoneContainer.clientHeight - dragWrapper.clientHeight;
+                
+                newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+                newTop = Math.max(0, Math.min(newTop, maxTop));
+
+                dragWrapper.style.left = `${newLeft}px`;
+                dragWrapper.style.top = `${newTop}px`;
+                dragWrapper.style.bottom = 'auto'; // release CSS baseline constraints
+                dragWrapper.style.right = 'auto';
+            });
+
+            dragWrapper.addEventListener('pointerup', (e) => {
+                isDragging = false;
+                dragWrapper.releasePointerCapture(e.pointerId);
+            });
+
+            // Click (Tap) Logic wrapper
+            dragWrapper.addEventListener('click', (e) => {
+                if (hasDragMoved) return; // Prevent counting if the user was just dragging
+                
+                if (currentMode === 1) {
+                    incrementCount();
+                    // Custom bouncy tap effect bridging drag vs scale changes
+                    const currentScale = monsterVisual.style.transform.replace(/scale\([^\)]+\)/, '');
+                    monsterVisual.style.transform = `${currentScale} scale(0.9)`.trim();
+                    setTimeout(() => updateUI(true), 150); 
+                }
+            });
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            if (mode === 1) {
+                btnLvl1.className = "text-xs font-bold text-white bg-blue-600 px-3 py-1.5 rounded-full transition-colors shadow-md";
+                btnLvl2.className = "text-xs font-bold text-gray-400 px-3 py-1.5 rounded-full transition-colors";
+            } else {
+                btnLvl1.className = "text-xs font-bold text-gray-400 px-3 py-1.5 rounded-full transition-colors";
+                btnLvl2.className = "text-xs font-bold text-white bg-blue-600 px-3 py-1.5 rounded-full transition-colors shadow-md";
+                watchedReelIds.clear(); 
+            }
+        }
+
+        // --- Feed & Auto-Tracking (Level 2) ---
+        function generateFeed(num) {
+            const gradients = ['feed-gradient-1', 'feed-gradient-2', 'feed-gradient-3'];
+            for (let i = 0; i < num; i++) {
+                const reel = document.createElement('div');
+                const grad = gradients[i % gradients.length];
+                reel.className = `reel w-full h-full snap-always flex items-center justify-center ${grad} relative border-b border-black/40`;
+                reel.dataset.id = i;
+                
+                // Enhanced placeholder UI mirroring authentic platforms
+                reel.innerHTML = `
+                    <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPjxyZWN0IHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==')] opacity-30 mix-blend-overlay pointer-events-none"></div>
+                    
+                    <div class="absolute right-4 bottom-24 flex flex-col gap-5 text-white z-10">
+                        <div class="flex flex-col items-center gap-1 group cursor-pointer"><div class="w-11 h-11 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center group-hover:bg-white/20 transition-all text-xl">🤍</div><span class="text-[10px] font-medium">1.${i}M</span></div>
+                        <div class="flex flex-col items-center gap-1 group cursor-pointer"><div class="w-11 h-11 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center group-hover:bg-white/20 transition-all text-xl">💬</div><span class="text-[10px] font-medium">4${i}K</span></div>
+                        <div class="flex flex-col items-center gap-1 group cursor-pointer"><div class="w-11 h-11 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center group-hover:bg-white/20 transition-all text-xl">↗️</div><span class="text-[10px] font-medium">Share</span></div>
+                    </div>
+
+                    <div class="absolute left-4 bottom-8 right-16 text-white z-10">
+                        <div class="flex items-center gap-2 mb-2">
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-pink-500 to-yellow-500 p-[2px]">
+                                <div class="w-full h-full bg-black rounded-full border-2 border-transparent"></div>
+                            </div>
+                            <span class="font-bold text-sm tracking-wide">@user_00${i}</span>
+                            <button class="ml-2 border border-white/40 px-3 py-1 rounded-full text-xs font-bold bg-white/10 backdrop-blur-sm">Follow</button>
+                        </div>
+                        <p class="text-sm text-white/90 line-clamp-2 leading-tight">Just scrolling through... the infinite void of content. #reel #scroll #${i}</p>
+                    </div>
+
+                    <div class="text-white/10 text-8xl font-black italic tracking-tighter mix-blend-overlay select-none">REEL ${i+1}</div>
+                `;
+                feed.appendChild(reel);
+            }
+        }
+
+        function setupIntersectionObserver() {
+            const options = { root: feed, rootMargin: '0px', threshold: 0.6 };
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    // Only count if scrolling mode is on AND takeover overlay isn't active
+                    if (entry.isIntersecting && currentMode === 2 && takeoverScreen.classList.contains('hidden')) {
+                        const id = entry.target.dataset.id;
+                        if (!watchedReelIds.has(id)) {
+                            watchedReelIds.add(id);
+                            incrementCount();
+                        }
+                    }
+                });
+            }, options);
+
+            document.querySelectorAll('.reel').forEach(reel => observer.observe(reel));
+        }
+
+        // --- Stats Dashboard ---
+        function openStats() {
+            statsModal.classList.remove('translate-y-full');
+            
+            document.getElementById('stat-today').textContent = currentCount;
+            document.getElementById('stat-time').innerHTML = `${(currentCount * 0.5).toFixed(1)}<span class="text-xl text-red-400/70 ml-1">m</span>`;
+
+            renderChart();
+        }
+
+        function renderChart() {
+            chartContainer.innerHTML = '';
+            
+            const displayData = [...historyData.slice(-6), currentCount];
+            const maxVal = Math.max(...displayData, 10);
+            const days = ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'TDY'];
+
+            displayData.forEach((val, index) => {
+                const heightPct = (val / maxVal) * 100;
+                const isToday = index === displayData.length - 1;
+                
+                const col = document.createElement('div');
+                col.className = 'flex flex-col items-center flex-1 h-full justify-end gap-2 group relative cursor-crosshair';
+                
+                // Fancy hover tooltips mapping perfectly across grid bars
+                col.innerHTML = `
+                    <div class="absolute -top-10 opacity-0 group-hover:opacity-100 group-hover:-translate-y-2 transition-all duration-300 bg-white text-black text-xs font-black px-2 py-1 rounded shadow-lg pointer-events-none z-10 whitespace-nowrap">
+                        ${val} Reels
+                        <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white rotate-45"></div>
+                    </div>
+                    <div class="w-full ${isToday ? 'bg-blue-400' : 'bg-slate-600 group-hover:bg-slate-500'} rounded-t-md bar-fill relative shadow-[0_0_10px_rgba(0,0,0,0.2)]" style="height: 0%"></div>
+                    <div class="text-[11px] ${isToday ? 'text-white font-bold' : 'text-slate-400 font-medium'} truncate w-full text-center tracking-wider">${days[index]}</div>
+                `;
+                
+                chartContainer.appendChild(col);
+
+                // Cascade animation loading effect
+                setTimeout(() => {
+                    col.querySelector('.bar-fill').style.height = `${Math.max(heightPct, 2)}%`;
+                }, 50 + (index * 50)); 
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>

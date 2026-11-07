@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { width: 320px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 15px; margin: 0; background: #fdfdfd; color: #333; }
+    h2 { font-size: 16px; margin: 0 0 10px 0; border-bottom: 2px solid #3b82f6; padding-bottom: 5px; }
+    .hidden { display: none !important; }
+    .btn { background: #3b82f6; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; }
+    .btn:hover { background: #2563eb; }
+    
+    /* Goal Screen */
+    #goal-screen input { width: 90%; padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+    
+    /* Main Screen */
+    .stat-box { background: #eef2ff; padding: 10px; border-radius: 6px; text-align: center; margin-bottom: 15px; }
+    .stat-box span { font-size: 18px; font-weight: bold; color: #1e40af; }
+    
+    .toggles label { display: block; margin-bottom: 6px; font-size: 13px; }
+    
+    .input-group { display: flex; gap: 5px; margin-bottom: 10px; }
+    .input-group input { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
+    .input-group button { background: #10b981; color: white; border: none; padding: 0 10px; border-radius: 4px; cursor: pointer; }
+    
+    .list { list-style: none; padding: 0; margin: 0 0 15px 0; max-height: 120px; overflow-y: auto; font-size: 13px; }
+    .list li { background: #f3f4f6; margin-bottom: 5px; padding: 6px 8px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; }
+    .note-stamp { color: #3b82f6; cursor: pointer; font-weight: bold; margin-right: 8px; }
+    .note-stamp:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <!-- Unlock Screen -->
+  <div id="goal-screen">
+    <h2>Set Your Intent</h2>
+    <p style="font-size:13px; color:#555;">Why are you opening YouTube?</p>
+    <input type="text" id="goal-input" placeholder="e.g. Find tutorial on algorithms..." />
+    <button class="btn" id="start-btn">Unlock 60-Minute Session</button>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="main-screen" class="hidden">
+    <div class="stat-box">
+      <div>Time Spent Today</div>
+      <span id="time-display">00:00:00</span>
+    </div>
+
+    <h2>Distractions</h2>
+    <div class="toggles" style="margin-bottom: 15px;">
+      <label><input type="checkbox" id="toggle-shorts"> Hide Shorts</label>
+      <label><input type="checkbox" id="toggle-sidebar"> Hide Sidebar</label>
+      <label><input type="checkbox" id="toggle-comments"> Hide Comments</label>
+    </div>
+
+    <h2>Study Checklist</h2>
+    <div class="input-group">
+      <input type="text" id="task-input" placeholder="New task..." />
+      <button id="add-task">+</button>
+    </div>
+    <ul id="task-list" class="list"></ul>
+
+    <h2>Video Notes</h2>
+    <div class="input-group">
+      <input type="text" id="note-input" placeholder="Take a note..." />
+      <button id="add-note">Add</button>
+    </div>
+    <ul id="note-list" class="list"></ul>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
