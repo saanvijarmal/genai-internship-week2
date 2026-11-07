@@ -88,8 +88,6 @@ Toggle Developer mode ON.
 Click Load unpacked and select the specific project folder.
 
 Run Python Video Script (Project 15):
-
-Bash
 cd Section-D/project-15-one-minute-reel-cut
 pip install opencv-python moviepy speechrecognition ffmpeg-python
 python reel_cut.py raw_video.mp4 final_reel.mp4
